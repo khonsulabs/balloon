@@ -131,8 +131,7 @@ func (b *Instance) Mix(h hash.Hash, salt []byte, sCost, tCost uint64) {
 
 				// math/big usually uses big-endian, with the exception of
 				// SetBits. We can unsafely convert otherBytes directly into
-				// a slice of big.Word to bypass the need to reverse
-				// otherBytes.
+				// a big.Word slice to bypass the need to reverse otherBytes.
 				header := *(*reflect.SliceHeader)(unsafe.Pointer(&otherBytes))
 				header.Len /= SizeOfWord
 				header.Cap /= SizeOfWord
