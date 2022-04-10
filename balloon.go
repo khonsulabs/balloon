@@ -11,13 +11,16 @@ import (
 	"encoding/binary"
 	"hash"
 	"math/big"
+	"reflect"
+	"unsafe"
 )
 
 const (
-	delta = 3
+	SizeOfWord = int(unsafe.Sizeof(big.Word(0)))
+	delta      = 3
 )
 
-// Instance represents Ballon instance (its internal state).
+// Instance represents Balloon instance (its internal state).
 type Instance struct {
 	Buffer    []byte
 	LastBlock []byte
@@ -25,7 +28,7 @@ type Instance struct {
 }
 
 // Balloon uses non-memory-hard cryptographic hash function h
-// and calculates memory-hard Ballon hash of passphrase with salt.
+// and calculates memory-hard Balloon hash of passphrase with salt.
 // sCost is the number of digest-sized blocks in buffer (space cost).
 // tCost is the number of rounds (time cost).
 func Balloon(h hash.Hash, passphrase, salt []byte, sCost, tCost uint64) []byte {
@@ -126,11 +129,15 @@ func (b *Instance) Mix(h hash.Hash, salt []byte, sCost, tCost uint64) {
 				h.Write(idxBlock)
 				otherBytes := h.Sum(nil)
 
-				for left, right := 0, len(otherBytes)-1; left < right; left, right = left+1, right-1 {
-					otherBytes[left], otherBytes[right] = otherBytes[right], otherBytes[left]
-				}
+				// math/big usually uses big-endian, with the exception of
+				// SetBits. We can unsafely convert otherBytes directly into
+				// a slice of big.Word to bypass the need to reverse
+				// otherBytes.
+				header := *(*reflect.SliceHeader)(unsafe.Pointer(&otherBytes))
+				header.Len /= SizeOfWord
+				header.Cap /= SizeOfWord
+				otherInt.SetBits(*(*[]big.Word)(unsafe.Pointer(&header)))
 
-				otherInt.SetBytes(otherBytes)
 				otherInt.Mod(otherInt, sCostInt)
 				other := otherInt.Uint64()
 				h.Reset()
